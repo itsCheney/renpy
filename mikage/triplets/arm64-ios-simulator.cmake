@@ -7,3 +7,9 @@ set(VCPKG_OSX_DEPLOYMENT_TARGET 13.0)
 # Mikage only links the Release framework. Avoid building an unused Debug
 # variant of each dependency in the iOS CI path.
 set(VCPKG_BUILD_TYPE release)
+# libffi's configure must see a cross build: vcpkg passes the same
+# aarch64-apple-darwin for --host and --build on Apple Silicon. This is the
+# host renpy-build uses for libffi on iOS.
+if(PORT STREQUAL "libffi")
+    set(VCPKG_MAKE_BUILD_TRIPLET "--host=aarch64-ios-darwin21")
+endif()
