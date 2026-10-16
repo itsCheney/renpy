@@ -146,11 +146,12 @@ target_compile_options(RenPyRuntime PRIVATE
   $<$<COMPILE_LANGUAGE:C>:-Wno-unused-function -Wno-unreachable-code -Wno-deprecated-declarations
     -Wno-incompatible-function-pointer-types -Wno-int-conversion>)
 # Ren'Py's own C (not pyobjus, not the bridge) reaches SDL's waits and swaps
-# through the hooks, so the bridge can hand control back to the app.
+# through the hooks, so the bridge can hand control back to the app. Joined
+# -include, since Xcode passes per-source options through without SHELL:.
 foreach(source IN LISTS RENPY_MODULE_SOURCES)
   if(NOT source MATCHES "pyobjus\\.c$")
     set_property(SOURCE "${source}" APPEND PROPERTY COMPILE_OPTIONS
-      "SHELL:-include ${CMAKE_CURRENT_SOURCE_DIR}/MikageRenPyHooks.h")
+      "-include${CMAKE_CURRENT_SOURCE_DIR}/MikageRenPyHooks.h")
   endif()
 endforeach()
 set_source_files_properties(MikageRenPyRuntime.mm PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
