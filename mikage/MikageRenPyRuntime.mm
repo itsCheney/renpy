@@ -23,6 +23,8 @@
 #import <UIKit/UIKit.h>
 
 #include <SDL3/SDL.h>
+// SDL_MAIN_HANDLED (set by CMakeLists.txt) keeps this to SDL_SetMainReady.
+#include <SDL3/SDL_main.h>
 
 #include <dlfcn.h>
 #include <pthread.h>
