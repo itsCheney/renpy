@@ -4,7 +4,14 @@
 #include <SDL3/SDL.h>
 #include "khrplatform.h"
 
-#if defined(__IPHONEOS__)
+#if defined(RENPY_MIKAGE)
+
+/* Mikage: OpenGL ES comes from MetalANGLE, which SDL loads for GL windows.
+ * Only types and constants are needed here; uguu resolves every entry point
+ * through SDL_GL_GetProcAddress. */
+#include <MetalANGLE/GLES3/gl3.h>
+
+#elif defined(__IPHONEOS__) || defined(SDL_PLATFORM_IOS)
 
 #include <OpenGLES/ES3/gl.h>
 

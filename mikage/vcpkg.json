@@ -1,0 +1,29 @@
+{
+  "name": "renpy-mikage-runtime",
+  "version-string": "0.1.0",
+  "description": "Native libraries Ren'Py links in Mikage's iOS RenPyRuntime.framework. SDL3 itself is Mikage's shared SDL3.framework (vcpkg's copy is only a dependency of SDL3_image and is not linked); FFmpeg is the one Mikage's KiriKiri build installs.",
+  "builtin-baseline": "8e8dfb4ba483886936ded5ca201b500b8d8b0096",
+  "dependencies": [
+    "sdl3",
+    {
+      "name": "sdl3-image",
+      "default-features": false,
+      "features": [ "png", "jpeg", "webp" ]
+    },
+    "freetype",
+    {
+      "name": "harfbuzz",
+      "default-features": false,
+      "features": [ "freetype" ]
+    },
+    "fribidi",
+    "libpng",
+    "libjpeg-turbo",
+    "libwebp",
+    "assimp",
+    "libffi",
+    "zlib",
+    "bzip2",
+    "liblzma"
+  ]
+}

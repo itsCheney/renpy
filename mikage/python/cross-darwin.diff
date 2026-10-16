@@ -1,0 +1,42 @@
+diff --git a/configure b/configure
+index 241cf8f..9958440 100755
+--- a/configure
++++ b/configure
+@@ -4279,12 +4279,21 @@ then
+ 	*-*-wasi)
+ 	    ac_sys_system=WASI
+ 	    ;;
++	*-*-darwin*)
++	    # Mikage: iOS, cross-built from macOS (after renpy-build).
++	    ac_sys_system=Darwin
++	    ;;
+ 	*)
+ 		# for now, limit cross builds to known configurations
+ 		MACHDEP="unknown"
+ 		as_fn_error $? "cross build not supported for $host" "$LINENO" 5
+ 	esac
+ 	ac_sys_release=
++	case "$host" in
++	*-*-darwin*)
++	    ac_sys_release=10.0
++	    ;;
++	esac
+     else
+ 	ac_sys_system=`uname -s`
+ 	if test "$ac_sys_system" = "AIX" \
+@@ -4335,6 +4344,15 @@ if test "$cross_compiling" = yes; then
+ 	*-*-cygwin*)
+ 		_host_cpu=
+ 		;;
++	*-*-darwin*)
++		case "$host_cpu" in
++		arm*|aarch64)
++			_host_cpu=arm
++			;;
++		*)
++			_host_cpu=$host_cpu
++		esac
++		;;
+ 	*-*-vxworks*)
+ 		_host_cpu=$host_cpu
+ 		;;

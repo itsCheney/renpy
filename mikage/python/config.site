@@ -1,0 +1,10 @@
+# Answers for checks configure can't run when cross-building CPython for
+# iOS (after renpy-build).
+ac_cv_file__dev_ptmx=no
+ac_cv_file__dev_ptc=no
+ac_cv_little_endian_double=yes
+ac_cv_func_getentropy=no
+ac_cv_have_long_long_format=yes
+ac_cv_func_clock_settime=no
+ac_cv_func_dup3=no
+ac_cv_func_pipe2=no
