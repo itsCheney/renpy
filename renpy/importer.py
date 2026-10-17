@@ -352,6 +352,16 @@ def add_python_directory(path: str):
             importer.add_prefix(path)
 
 
+def invalidate_caches():
+    """
+    Forgets the modules found so far, so the next import rescans the game files.
+    """
+
+    for importer in sys.meta_path:
+        if isinstance(importer, RenpyImporter):
+            importer.invalidate_caches()
+
+
 def init_importer():
     meta_backup[:] = sys.meta_path
 

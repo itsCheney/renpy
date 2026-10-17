@@ -251,6 +251,10 @@ def index_files():
     for fn in remote_files:
         lower_map[unicodedata.normalize("NFC", fn.lower())] = fn
 
+    # An import made before the indexes existed (pyobjus on iOS) left the
+    # module importer with an empty cache, hiding game/python-packages.
+    renpy.importer.invalidate_caches()
+
 
 def index_archives():
     """
