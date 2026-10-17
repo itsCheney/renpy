@@ -10,6 +10,9 @@ own desktop, Android or renpy-build builds.
 - `MikageRenPyHooks.h`: force-included into Ren'Py's C so `SDL_WaitEvent`,
   `SDL_PollEvent`, `SDL_Delay` and `SDL_GL_SwapWindow` hand control back to
   the app.
+- `MikageRenPyStubs.m`: `IAPHelper` and `Age`, the Objective-C classes
+  Ren'Py looks up on iOS (renpy-build's Xcode project normally has them).
+  They report no App Store purchases and no age range.
 - `mikage_session.py`: runs `renpy.py` for one game with Mikage's save folder.
 - `CMakeLists.txt`: compiles every module in `src/Setup` (from
   `python setup.py generate`) as a built-in module, with CPython 3.12,

@@ -119,6 +119,7 @@ add_library(RenPyRuntime SHARED
   ${RENPY_MODULE_SOURCES}
   "${inittab}"
   MikageRenPyRuntime.mm
+  MikageRenPyStubs.m
   MikageRenPyFiber.S
   MikageRenPyRuntime.h
   MikageRenPyHooks.h)
@@ -154,7 +155,7 @@ foreach(source IN LISTS RENPY_MODULE_SOURCES)
       "-include${CMAKE_CURRENT_SOURCE_DIR}/MikageRenPyHooks.h")
   endif()
 endforeach()
-set_source_files_properties(MikageRenPyRuntime.mm PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
+set_source_files_properties(MikageRenPyRuntime.mm MikageRenPyStubs.m PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
 
 # Every static library vcpkg installed for this SDK except its own SDL3.
 file(GLOB RENPY_DEPS_LIBRARIES "${RENPY_DEPS_PREFIX}/lib/*.a")
