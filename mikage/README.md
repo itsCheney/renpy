@@ -17,6 +17,8 @@ own desktop, Android or renpy-build builds.
   SDL3.framework; OpenGL ES comes from MetalANGLE, never Apple's OpenGLES.
 - `python/`: CPython 3.12 cross-build pieces for iOS, after renpy-build
   (`cross-darwin.diff` patches `configure` directly, so no autoreconf).
+- `pylib/`: pure-Python packages Ren'Py imports at startup, shipped next to
+  it: `six.py` 1.17.0 (MIT, unmodified from PyPI).
 
 Limits for now: one Ren'Py game per app launch (Python can't be restarted
 in a process), no Live2D, no `ssl` module.
