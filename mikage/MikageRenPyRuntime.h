@@ -98,6 +98,39 @@ typedef struct MikageRenPyStats {
 } MikageRenPyStats;
 bool MikageRenPyGetStats(MikageRenPyStats *stats);
 
+// Quick actions and the game menu's controls. Each runs the game's own
+// action (Preference auto-forward, Skip, QuickSave, QuickLoad, ShowMenu)
+// inside Ren'Py's event handling on the next step.
+typedef enum MikageRenPyCommand {
+    MikageRenPyCommandAuto = 1,
+    MikageRenPyCommandSkip = 2,
+    MikageRenPyCommandQuickSave = 3,
+    MikageRenPyCommandQuickLoad = 4,
+    MikageRenPyCommandBacklog = 5,
+    MikageRenPyCommandSave = 6,
+    MikageRenPyCommandLoad = 7,
+} MikageRenPyCommand;
+typedef enum MikageRenPyControl {
+    MikageRenPyControlAuto = 1 << 0,
+    MikageRenPyControlSkip = 1 << 1,
+    MikageRenPyControlCanAuto = 1 << 8,
+    MikageRenPyControlCanSkip = 1 << 9,
+    MikageRenPyControlCanQuickSave = 1 << 10,
+    MikageRenPyControlCanQuickLoad = 1 << 11,
+    MikageRenPyControlCanBacklog = 1 << 12,
+    MikageRenPyControlCanSave = 1 << 13,
+    MikageRenPyControlCanLoad = 1 << 14,
+} MikageRenPyControl;
+bool MikageRenPyRunCommand(int32_t command);
+// The controls as of the last step; each call asks for a fresh reading.
+uint32_t MikageRenPyGameControls(void);
+// Holds or releases a skip that, unlike the game's own Ctrl, also skips
+// unseen text.
+bool MikageRenPySetControlSkip(bool held);
+// The host's trackpad cursor, as a mouse at x, y in window points.
+// phase: 0 move, 1 left down, 2 left up, 3 right down, 4 right up.
+bool MikageRenPySendPointer(int32_t phase, float x, float y);
+
 #ifdef __cplusplus
 }
 #endif

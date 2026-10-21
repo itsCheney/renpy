@@ -91,3 +91,168 @@ def prepare_quit():
             renpy.store._confirm_quit = False
     except Exception:
         pass
+
+
+# Mikage's quick actions and game menu. Each command the game's own UI
+# would run is bound to a spare key (F13 and up) in a keymap under every
+# screen, and Mikage presses that key: the action then runs inside Ren'Py's
+# event handling, exactly as if the game's button were clicked. These
+# numbers match MikageRenPyCommand.
+
+_KEYS = {
+    1: "K_F13",  # auto
+    2: "K_F14",  # skip
+    3: "K_F15",  # quick save
+    4: "K_F16",  # quick load
+    5: "K_F17",  # backlog
+    6: "K_F18",  # save
+    7: "K_F19",  # load
+}
+
+_keymap_installed = False
+
+# The skip_unseen preference from before Ctrl was held, or None.
+_held_skip_unseen = None
+
+
+def _in_game():
+    import renpy
+
+    try:
+        return not renpy.store.main_menu and not renpy.game.context().init_phase
+    except Exception:
+        return False
+
+
+def _show_menu(screen):
+    import renpy
+
+    def run():
+        if _in_game() and renpy.exports.has_screen(screen):
+            renpy.store.ShowMenu(screen)()
+
+    return run
+
+
+def _toggle_auto():
+    import renpy
+
+    prefs = renpy.game.preferences
+    if not prefs.afm_enable and renpy.config.skipping:
+        renpy.config.skipping = None
+    prefs.afm_enable = not prefs.afm_enable
+    renpy.exports.restart_interaction()
+
+
+def _toggle_skip():
+    import renpy
+
+    if not renpy.config.skipping:
+        renpy.game.preferences.afm_enable = False
+    # The game's own Skip action, which also stops it: it follows the "skip
+    # unseen text" preference and the game's rules for where skipping runs.
+    renpy.store.Skip()()
+
+
+def _quick_save():
+    import renpy
+
+    if _in_game():
+        renpy.store.QuickSave()()
+
+
+def _quick_load():
+    import renpy
+
+    if _in_game():
+        renpy.store.QuickLoad(confirm=False)()
+
+
+def install_keymap():
+    """
+    Binds Mikage's keys, once. Called before the bridge first presses one.
+    """
+
+    global _keymap_installed
+
+    import renpy
+
+    if not _keymap_installed:
+        actions = {
+            1: _toggle_auto,
+            2: _toggle_skip,
+            3: _quick_save,
+            4: _quick_load,
+            5: _show_menu("history"),
+            6: _show_menu("save"),
+            7: _show_menu("load"),
+        }
+
+        bindings = {}
+        for number, key in _KEYS.items():
+            name = "mikage_%d" % number
+            renpy.config.keymap[name] = [key]
+            bindings[name] = actions[number]
+
+        renpy.config.underlay.append(renpy.display.behavior.Keymap(**bindings))
+        renpy.display.behavior.clear_keymap_cache()
+        renpy.exports.restart_interaction()
+        _keymap_installed = True
+
+
+def set_control_skip(held):
+    """
+    Holds or releases Ctrl as a quick action: unlike the game's own Ctrl,
+    it skips unseen text too, by turning on "skip unseen text" while held.
+    """
+
+    global _held_skip_unseen
+
+    import renpy
+
+    prefs = renpy.game.preferences
+    if held:
+        if not renpy.config.allow_skipping or not renpy.store._skipping:
+            return
+        if _held_skip_unseen is None:
+            _held_skip_unseen = prefs.skip_unseen
+        prefs.skip_unseen = True
+        prefs.afm_enable = False
+        renpy.config.skipping = "slow"
+    else:
+        if _held_skip_unseen is not None:
+            prefs.skip_unseen = _held_skip_unseen
+            _held_skip_unseen = None
+        renpy.config.skipping = None
+    renpy.exports.restart_interaction()
+
+
+def controls():
+    """
+    What the game menu shows, as MikageRenPyControl bits.
+    """
+
+    import renpy
+
+    try:
+        prefs = renpy.game.preferences
+        bits = 0x100
+        if prefs.afm_enable:
+            bits |= 0x1
+        if renpy.config.skipping and _held_skip_unseen is None:
+            bits |= 0x2
+        if renpy.config.allow_skipping and renpy.store._skipping:
+            bits |= 0x200
+        if _in_game():
+            bits |= 0x400
+            if renpy.exports.can_load("quick-1"):
+                bits |= 0x800
+            if renpy.exports.has_screen("history"):
+                bits |= 0x1000
+            if renpy.exports.has_screen("save"):
+                bits |= 0x2000
+            if renpy.exports.has_screen("load"):
+                bits |= 0x4000
+        return bits
+    except Exception:
+        return 0

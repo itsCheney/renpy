@@ -36,6 +36,7 @@
 #include <cstring>
 #include <mutex>
 #include <string>
+#include <vector>
 
 #ifndef MIKAGE_RENPY_VERSION
 #define MIKAGE_RENPY_VERSION "unknown"
@@ -76,6 +77,13 @@ bool foreground = true;
 bool processUsed = false;
 bool pythonInitialized = false;
 PyThreadState *mainThreadState = nullptr;
+
+// Quick actions and game menu commands waiting for the engine, and the
+// game's controls as last read. Main thread only.
+std::vector<int32_t> pendingCommands;
+int pendingControlSkip = -1;
+bool controlsRequested = false;
+uint32_t cachedControls = 0;
 
 bool stopRequested = false;
 bool stopPrepared = false;
@@ -335,8 +343,70 @@ void engineMain(void *)
     __builtin_unreachable();
 }
 
+SDL_Window *engineWindow();
+
+// Calls mikage_session.name(args); returns its integer result, or -1.
+long callSession(const char *name, const char *format = nullptr, int argument = 0)
+{
+    long value = -1;
+    if (PyObject *session = PyImport_ImportModule("mikage_session")) {
+        PyObject *result = format ? PyObject_CallMethod(session, name, format, argument)
+                                  : PyObject_CallMethod(session, name, nullptr);
+        if (result) {
+            if (PyLong_Check(result))
+                value = PyLong_AsLong(result);
+            Py_DECREF(result);
+        }
+        Py_DECREF(session);
+    }
+    if (PyErr_Occurred())
+        takePythonError();
+    PyErr_Clear();
+    return value;
+}
+
+// Runs on the engine stack with the GIL, between engine steps. Commands
+// become presses of the keys mikage_session binds, so they run inside
+// Ren'Py's own event handling.
+void runHostRequests()
+{
+    if (pendingCommands.empty() && pendingControlSkip < 0 && !controlsRequested)
+        return;
+    if (!pendingCommands.empty()) {
+        callSession("install_keymap");
+        SDL_Window *window = engineWindow();
+        for (int32_t command : pendingCommands) {
+            SDL_Event event;
+            SDL_zero(event);
+            event.key.timestamp = SDL_GetTicksNS();
+            event.key.windowID = window ? SDL_GetWindowID(window) : 0;
+            // F13 and up, as mikage_session._KEYS binds them.
+            event.key.scancode = static_cast<SDL_Scancode>(SDL_SCANCODE_F13 + command - 1);
+            event.key.key = SDLK_F13 + static_cast<SDL_Keycode>(command - 1);
+            event.type = SDL_EVENT_KEY_DOWN;
+            event.key.down = true;
+            SDL_PushEvent(&event);
+            event.type = SDL_EVENT_KEY_UP;
+            event.key.down = false;
+            SDL_PushEvent(&event);
+        }
+        pendingCommands.clear();
+    }
+    if (pendingControlSkip >= 0) {
+        callSession("set_control_skip", "i", pendingControlSkip);
+        pendingControlSkip = -1;
+    }
+    if (controlsRequested) {
+        const long controls = callSession("controls");
+        cachedControls = controls > 0 ? static_cast<uint32_t>(controls) : 0;
+        controlsRequested = false;
+    }
+}
+
 void afterResume()
 {
+    if (pythonInitialized && running && !stopRequested)
+        runHostRequests();
     if (!stopRequested || stopPrepared || !pythonInitialized)
         return;
     stopPrepared = true;
@@ -486,6 +556,10 @@ void finishSession(bool forced)
     foreground = true;
     stopRequested = false;
     stopPrepared = false;
+    pendingCommands.clear();
+    pendingControlSkip = -1;
+    controlsRequested = false;
+    cachedControls = 0;
     lastError = message;
     auto callback = completionCallback;
     auto context = callbackContext;
@@ -729,6 +803,58 @@ extern "C" bool MikageRenPySendBack(void)
         return false;
     event.type = SDL_EVENT_KEY_UP;
     event.key.down = false;
+    return SDL_PushEvent(&event);
+}
+
+extern "C" bool MikageRenPyRunCommand(int32_t command)
+{
+    if (!running || stopRequested || command < MikageRenPyCommandAuto || command > MikageRenPyCommandLoad)
+        return false;
+    pendingCommands.push_back(command);
+    return true;
+}
+
+extern "C" uint32_t MikageRenPyGameControls(void)
+{
+    if (!running)
+        return 0;
+    // Read on the engine's next step; the menu asks again as it refreshes.
+    controlsRequested = true;
+    return cachedControls;
+}
+
+extern "C" bool MikageRenPySetControlSkip(bool held)
+{
+    if (!running || stopRequested)
+        return false;
+    pendingControlSkip = held ? 1 : 0;
+    return true;
+}
+
+extern "C" bool MikageRenPySendPointer(int32_t phase, float x, float y)
+{
+    SDL_Window *window = running && foreground ? engineWindow() : nullptr;
+    if (!window || phase < 0 || phase > 4)
+        return false;
+    SDL_Event event;
+    SDL_zero(event);
+    if (phase == 0) {
+        event.type = SDL_EVENT_MOUSE_MOTION;
+        event.motion.timestamp = SDL_GetTicksNS();
+        event.motion.windowID = SDL_GetWindowID(window);
+        event.motion.x = x;
+        event.motion.y = y;
+        return SDL_PushEvent(&event);
+    }
+    const bool down = phase == 1 || phase == 3;
+    event.type = down ? SDL_EVENT_MOUSE_BUTTON_DOWN : SDL_EVENT_MOUSE_BUTTON_UP;
+    event.button.timestamp = SDL_GetTicksNS();
+    event.button.windowID = SDL_GetWindowID(window);
+    event.button.button = phase >= 3 ? SDL_BUTTON_RIGHT : SDL_BUTTON_LEFT;
+    event.button.down = down;
+    event.button.clicks = 1;
+    event.button.x = x;
+    event.button.y = y;
     return SDL_PushEvent(&event);
 }
 
