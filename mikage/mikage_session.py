@@ -256,3 +256,20 @@ def controls():
         return bits
     except Exception:
         return 0
+
+
+def game_size():
+    """
+    The game's own size, as width << 16 | height, or 0 before it is known.
+    """
+
+    import renpy
+
+    try:
+        width = int(renpy.config.screen_width)
+        height = int(renpy.config.screen_height)
+        if not (0 < width < 0x8000 and 0 < height < 0x10000):
+            return 0
+        return (width << 16) | height
+    except Exception:
+        return 0

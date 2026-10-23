@@ -95,6 +95,10 @@ typedef struct MikageRenPyStats {
     int32_t drawableHeight;
     // The GL renderer, e.g. "MetalANGLE".
     char renderer[32];
+    // The game's own size (config.screen_width and screen_height), which
+    // Ren'Py fits into the window with bars; 0 until the game has set it.
+    int32_t gameWidth;
+    int32_t gameHeight;
 } MikageRenPyStats;
 bool MikageRenPyGetStats(MikageRenPyStats *stats);
 

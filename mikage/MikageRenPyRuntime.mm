@@ -84,6 +84,9 @@ std::vector<int32_t> pendingCommands;
 int pendingControlSkip = -1;
 bool controlsRequested = false;
 uint32_t cachedControls = 0;
+// The game's size as last read, packed as width << 16 | height.
+bool gameSizeRequested = false;
+uint32_t cachedGameSize = 0;
 
 bool stopRequested = false;
 bool stopPrepared = false;
@@ -372,7 +375,7 @@ long callSession(const char *name, const char *format = nullptr, int argument = 
 // had raised.
 void runHostRequests()
 {
-    if (pendingCommands.empty() && pendingControlSkip < 0 && !controlsRequested)
+    if (pendingCommands.empty() && pendingControlSkip < 0 && !controlsRequested && !gameSizeRequested)
         return;
     PyGILState_STATE gil = PyGILState_Ensure();
     PyObject *engineException = PyErr_GetRaisedException();
@@ -404,6 +407,11 @@ void runHostRequests()
         const long controls = callSession("controls");
         cachedControls = controls > 0 ? static_cast<uint32_t>(controls) : 0;
         controlsRequested = false;
+    }
+    if (gameSizeRequested) {
+        const long size = callSession("game_size");
+        cachedGameSize = size > 0 ? static_cast<uint32_t>(size) : 0;
+        gameSizeRequested = false;
     }
     PyErr_SetRaisedException(engineException);
     PyGILState_Release(gil);
@@ -566,6 +574,8 @@ void finishSession(bool forced)
     pendingControlSkip = -1;
     controlsRequested = false;
     cachedControls = 0;
+    gameSizeRequested = false;
+    cachedGameSize = 0;
     lastError = message;
     auto callback = completionCallback;
     auto context = callbackContext;
@@ -954,6 +964,10 @@ extern "C" bool MikageRenPyGetStats(MikageRenPyStats *stats)
         stats->drawableHeight = height;
     }
     std::strncpy(stats->renderer, "MetalANGLE", sizeof(stats->renderer) - 1);
+    // Read on the engine's next step, as the controls are.
+    stats->gameWidth = static_cast<int32_t>(cachedGameSize >> 16);
+    stats->gameHeight = static_cast<int32_t>(cachedGameSize & 0xFFFF);
+    gameSizeRequested = true;
     statsSinceNS = now;
     presentCount = stepCount = stepTotalNS = stepMaxNS = 0;
     return true;
