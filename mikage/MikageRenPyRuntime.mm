@@ -365,13 +365,17 @@ long callSession(const char *name, const char *format = nullptr, int argument = 
     return value;
 }
 
-// Runs on the engine stack with the GIL, between engine steps. Commands
-// become presses of the keys mikage_session binds, so they run inside
-// Ren'Py's own event handling.
+// Runs on the engine stack between engine steps. Commands become presses
+// of the keys mikage_session binds, so they run inside Ren'Py's own event
+// handling. The engine yields from inside `with nogil` blocks (swap, wait,
+// delay), so this takes the GIL itself, and keeps any exception the engine
+// had raised.
 void runHostRequests()
 {
     if (pendingCommands.empty() && pendingControlSkip < 0 && !controlsRequested)
         return;
+    PyGILState_STATE gil = PyGILState_Ensure();
+    PyObject *engineException = PyErr_GetRaisedException();
     if (!pendingCommands.empty()) {
         callSession("install_keymap");
         SDL_Window *window = engineWindow();
@@ -401,6 +405,8 @@ void runHostRequests()
         cachedControls = controls > 0 ? static_cast<uint32_t>(controls) : 0;
         controlsRequested = false;
     }
+    PyErr_SetRaisedException(engineException);
+    PyGILState_Release(gil);
 }
 
 void afterResume()
