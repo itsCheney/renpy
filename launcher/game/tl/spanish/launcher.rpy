@@ -98,7 +98,7 @@
     # android.rpy:49
     old "Disconnects from an Android device running ADB in TCP/IP mode."
     new "Se desconecta de un dispositivo Android que ejecuta ADB en modo TCP/IP."
-    
+
 
     # android.rpy:50
     old "Retrieves the log from the Android device and writes it to a file."
@@ -1947,7 +1947,7 @@
     # game/editor.rpy:152
     old "A modern editor with many extensions including advanced Ren'Py integration."
     new "Un editor moderno con muchas extensiones, incluida la integración avanzada de Ren'Py."
-    
+
 
     # game/editor.rpy:153
     old "A modern editor with many extensions including advanced Ren'Py integration.\n{a=jump:reinstall_vscode}Upgrade Visual Studio Code to the latest version.{/a}"
@@ -2272,9 +2272,6 @@
     # game/preferences.rpy:258
     old "Prefer the web documentation"
     new "Preferir la documentación web"
-# TODO: Translation updated at 2026-09-29 08:37
-
-translate spanish strings:
 
     # game/android.rpy:45
     old "Attempts to emulate a television-based Android console.\n\nController input is mapped to the arrow keys, Enter is mapped to the select button, Escape is mapped to the menu button, and PageUp is mapped to the back button."
@@ -2360,3 +2357,46 @@ translate spanish strings:
     old "Updating while Ren'Py games are running on this computer can cause problems. Please close all Ren'Py games before proceeding."
     new "Actualizar mientras hay juegos de Ren'Py en ejecución en esta computadora puede causar problemas. Cierra todos los juegos de Ren'Py antes de continuar."
 
+    # game/wavedash.rpy:81
+    old "Downloading the Wavedash CLI."
+    new "Descargando la CLI de Wavedash."
+
+    # game/wavedash.rpy:210
+    old "The Wavedash game ID has not been set."
+    new "El ID de juego de Wavedash no se ha establecido."
+
+    # game/wavedash.rpy:210
+    old "Create a game at {a=https://wavedash.com/dev-portal}wavedash.com/dev-portal{/a}, then add a line like \n{vspace=5}define build.wavedash_id = \"YOUR_GAME_ID_HERE\"\n{vspace=5} to options.rpy."
+    new "Crea un juego en {a=https://wavedash.com/dev-portal}wavedash.com/dev-portal{/a} y luego agrega una línea como \n{vspace=5}define build.wavedash_id = \"TU_ID_DE_JUEGO_AQUÍ\"\n{vspace=5} en options.rpy."
+
+    # game/wavedash.rpy:222
+    old "The web distribution could not be found. Would you like to build it now and upload it to Wavedash?"
+    new "No se pudo encontrar la distribución web. ¿Quieres crearla ahora y subirla a Wavedash?"
+
+    # game/wavedash.rpy:230
+    old "The Wavedash configuration in the web distribution could not be read."
+    new "No se pudo leer la configuración de Wavedash en la distribución web."
+
+    # game/wavedash.rpy:230
+    old "Please choose 'Web', 'Build Web Application' and try again."
+    new "Elige 'Web', 'Construir aplicación web' y vuelve a intentarlo."
+
+    # game/wavedash.rpy:237
+    old "The Wavedash game ID changed after the web distribution was built. Would you like to rebuild it now and upload it to Wavedash?"
+    new "El ID de juego de Wavedash cambió después de crear la distribución web. ¿Quieres reconstruirla ahora y subirla a Wavedash?"
+
+    # game/wavedash.rpy:253
+    old "RenPyWeb could not be installed."
+    new "No se pudo instalar RenPyWeb."
+
+    # game/wavedash.rpy:270
+    old "The web distribution was built for a different Wavedash game."
+    new "La distribución web se creó para un juego de Wavedash diferente."
+
+    # game/wavedash.rpy:278
+    old "The Wavedash CLI is not available for this platform."
+    new "La CLI de Wavedash no está disponible para esta plataforma."
+
+    # game/web.rpy:570
+    old "Upload to wavedash.com"
+    new "Subir a wavedash.com"
