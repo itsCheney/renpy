@@ -1,4 +1,141 @@
-﻿testsuite global:
+﻿init python:
+
+    def check_dists_license():
+        """
+        Checks that every archive built for the current project contains
+        renpy/LICENSE.txt, and that it matches sphinx/source/license.rst.
+        Returns True if so, and raises an exception otherwise.
+        """
+
+        import tarfile
+        import zipfile
+
+        with open(os.path.join(config.renpy_base, "sphinx", "source", "license.rst"), "rb") as f:
+            license = f.read()
+
+        p = project.current
+        destination = os.path.join(p.parent_path, p.dump["build"]["destination"])
+
+        archives = [ i for i in os.listdir(destination) if i.endswith((".zip", ".tar.bz2")) ]
+
+        if not archives:
+            raise Exception("No archives were built in {}.".format(destination))
+
+        for fn in archives:
+            path = os.path.join(destination, fn)
+
+            if fn.endswith(".zip"):
+                with zipfile.ZipFile(path) as zf:
+                    names = [ i for i in zf.namelist() if i.endswith("/renpy/LICENSE.txt") ]
+                    contents = [ zf.read(i) for i in names ]
+            else:
+                with tarfile.open(path) as tf:
+                    names = [ i for i in tf.getnames() if i.endswith("/renpy/LICENSE.txt") ]
+                    contents = [ tf.extractfile(i).read() for i in names ]
+
+            if not contents:
+                raise Exception("{} does not contain renpy/LICENSE.txt.".format(fn))
+
+            for name, data in zip(names, contents):
+                if data != license:
+                    raise Exception("{} in {} does not match license.rst.".format(name, fn))
+
+        return True
+
+    def check_mobile_license():
+        """
+        Checks that the android and ios packages for the current project contain
+        renpy/LICENSE.txt, and that it matches sphinx/source/license.rst. These packages
+        are directories that aren't part of a normal build, so they're built to a temporary
+        directory. Only the license is copied, as this blocks the event loop while it runs.
+        Returns True if so, and raises an exception otherwise.
+        """
+
+        import shutil
+        import tempfile
+
+        class LicenseFilter(object):
+            def filter(self, file, variant, format):
+                return file.name == "renpy/LICENSE.txt"
+
+        with open(os.path.join(config.renpy_base, "sphinx", "source", "license.rst"), "rb") as f:
+            license = f.read()
+
+        tempdir = tempfile.mkdtemp(prefix="renpy-test-")
+
+        try:
+            for package in [ "android", "ios" ]:
+                dest = os.path.join(tempdir, package)
+
+                distribute.Distributor(project.current,
+                    reporter=distribute.TextReporter(),
+                    packages=[ package ],
+                    build_update=False,
+                    noarchive=True,
+                    packagedest=dest,
+                    report_success=False,
+                    scan=False,
+                    files_filter=LicenseFilter(),
+                    )
+
+                with open(os.path.join(dest, "renpy", "LICENSE.txt"), "rb") as f:
+                    if f.read() != license:
+                        raise Exception("renpy/LICENSE.txt in {} does not match license.rst.".format(package))
+        finally:
+            shutil.rmtree(tempdir)
+
+        return True
+
+    def check_package_failures():
+        """
+        Checks that failures while packaging reach the code that started the build.
+        Returns True if so, and raises an exception otherwise.
+        """
+
+        import shutil
+        import tempfile
+
+        class FailingPackage(object):
+            def close(self, progress=None):
+                raise Exception("This failure is expected by the test.")
+
+        distribute.ParallelPackage(FailingPackage(), None, "failing").close()
+
+        try:
+            distribute.wait_parallel_threads()
+        except Exception as e:
+            if "failing" not in str(e):
+                raise
+        else:
+            raise Exception("A failure in a package thread was ignored.")
+
+        tempdir = tempfile.mkdtemp(prefix="renpy-test-")
+
+        try:
+            # Zip has nothing to do, so it fails.
+            package = distribute.ExternalZipPackage(os.path.join(tempdir, "empty.zip"))
+
+            try:
+                package.close()
+            except Exception:
+                pass
+            else:
+                raise Exception("A failure of zip was ignored.")
+
+        finally:
+            shutil.rmtree(tempdir)
+
+        return True
+
+
+testsuite global:
+    setup:
+        # On a tree that has never run the launcher, it starts by asking for a language.
+        pause until (screen "choose_language" or id "pref_btn")
+
+        if screen "choose_language":
+            click "Start using Ren'Py"
+
     teardown:
         exit
 
@@ -140,6 +277,13 @@ testsuite default:
         click "Build"
         pause until "Return"
         click "Return"
+
+        assert eval check_dists_license()
+        assert eval check_mobile_license()
+
+
+    testcase package_failures:
+        assert eval check_package_failures()
 
 
     testcase choose_colors:

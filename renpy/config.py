@@ -1679,6 +1679,12 @@ If True, live2d will use the old Bezier curve behavior, which usees easing. If F
 of beziers is used.
 """
 
+live2d_pose: bool = True
+"""
+If True, Live2D displayables use the pose file of their model, unless the `pose` parameter says otherwise. If False,
+pose files are ignored by default.
+"""
+
 special_directory_map: dict[str, list[str]] = {"images": ["images"], "audio": ["audio"], "fonts": ["fonts"]}
 """
 This maps the special directory names ('images', 'audio', 'fonts') to a list of directories that will
@@ -1688,6 +1694,12 @@ be searched for that kind of file.
 font_size_adjust: dict[str, float | Callable[[str, float], float]] = {}
 """
 A map from font name to a multiplier or function that's used to adjust the size of a font.
+"""
+
+font_memory_buffer_size: int = 2 * 1024 * 1024
+"""
+Fonts smaller than this many bytes are loaded into memory by the harfbuzz shaper. Larger fonts are read from
+disk as needed.
 """
 
 scene_uses_tag_layer: bool = True
@@ -1778,3 +1790,5 @@ def post_init():
 
     if renpy.config.raise_image_load_exceptions is None:
         renpy.config.raise_image_load_exceptions = renpy.config.developer
+
+    renpy.display.im.thread_local.raise_image_load_exceptions = bool(renpy.config.raise_image_load_exceptions)

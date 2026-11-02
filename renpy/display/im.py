@@ -356,13 +356,15 @@ class Cache:
                     texsurf = ce.surf.subsurface(ce.bounds)
                     renpy.display.render.mutated_surface(texsurf)
 
+                properties = {}
+
+                if not image.premultiply:
+                    properties["premultiplied"] = True
+
                 if image.mipmap is not None:
-                    ce.texture = renpy.display.draw.load_texture(
-                        texsurf,
-                        properties={"mipmap": image.mipmap},  # type: ignore
-                    )
-                else:
-                    ce.texture = renpy.display.draw.load_texture(texsurf)
+                    properties["mipmap"] = image.mipmap
+
+                ce.texture = renpy.display.draw.load_texture(texsurf, properties=properties)
 
                 # This was loaded while predicting images for immediate use,
                 # so get it onto the GPU.
@@ -678,6 +680,9 @@ class ImageBase(renpy.display.displayable.Displayable):
     # False otherwise.
     const_size = False
 
+    # True if the image should be premultiplied, False otherwise.
+    premultiply = True
+
     def after_upgrade(self, version):
         if version < 1:
             self.cache = True
@@ -690,6 +695,7 @@ class ImageBase(renpy.display.displayable.Displayable):
         self.optimize_bounds = properties.pop("optimize_bounds", True)
         self.oversample = properties.pop("oversample", None)
         self.mipmap = properties.pop("mipmap", None)
+        self.premultiply = properties.pop("premultiply", True)
 
         if self.oversample is not None and self.oversample <= 0:
             raise Exception("Image's oversample parameter must be greater than 0.")
@@ -733,7 +739,7 @@ class ImageBase(renpy.display.displayable.Displayable):
             d = self.get_oversampled_image()
             return cache.get(d, render=True)
         except Exception as e:
-            if renpy.config.raise_image_load_exceptions:
+            if thread_local.raise_image_load_exceptions:
                 raise
 
             self.fail = renpy.text.text.Text(str(e), style="_image_error")
@@ -784,6 +790,28 @@ class ImageBase(renpy.display.displayable.Displayable):
 
 ignored_images: set[str] = set()
 images_to_ignore: set[str] = set()
+
+
+class ThreadLocal(threading.local):
+    """
+    Per-thread image state that engine code may change at runtime, as config
+    variables must not be changed after the init phase.
+    """
+
+    raise_image_load_exceptions: bool
+    """
+    If true, ImageBase.render raises exceptions that occur while loading an
+    image, rather than displaying them as text. This is initialized from
+    :var:`config.raise_image_load_exceptions` at the end of the init phase,
+    set to False when the player ignores an exception, and temporarily set
+    to True while rendering focus masks.
+    """
+
+    def __init__(self):
+        self.raise_image_load_exceptions = bool(renpy.config.raise_image_load_exceptions)
+
+
+thread_local = ThreadLocal()
 
 
 class Image(ImageBase):
@@ -1028,17 +1056,22 @@ class Null(ImageBase):
 
 class UnoptimizedTexture(ImageBase):
     """
-    :undocumented:
+    :doc: im_image
+    :name: RawTexture
 
-    This is used by unoptimized_texture to force a texture to load without
-    optimizing the bounds.
+    Loads an image as a texture, without optimizing its bounds.
+
+    `premultiply`
+        If False, alpha premultiplication is not applied when the image is loaded as a texture, so the
+        color channels reach the shader unchanged. This is useful for textures that contain data, like
+        normal maps, where the color channels should not be scaled by alpha.
     """
 
     obsolete = False
 
-    def __init__(self, im, **properties):
+    def __init__(self, im, premultiply=True, **properties):
         im = image(im)
-        super().__init__(im.identity, optimize_bounds=False, **properties)
+        super().__init__(im.identity, optimize_bounds=False, premultiply=premultiply, **properties)
         self.image = im
 
         self.const_size = im.const_size
@@ -1209,7 +1242,7 @@ def load_rgba(data: bytes, size: tuple[int, int]) -> Any:
     return renpy.display.draw.load_texture(surf)
 
 
-def unoptimized_texture(d):
+def unoptimized_texture(d, premultiply=True):
     """
     :undocumented:
 
@@ -1217,8 +1250,10 @@ def unoptimized_texture(d):
     the image without optimizing the bounds. Otherwise, return `d`.
     """
 
-    if isinstance(d, ImageBase):
-        return UnoptimizedTexture(d, mipmap=True)
+    if isinstance(d, UnoptimizedTexture) and d.premultiply == premultiply:
+        return d
+    elif isinstance(d, ImageBase):
+        return UnoptimizedTexture(d, mipmap=True, premultiply=premultiply)
     else:
         return d
 

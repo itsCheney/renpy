@@ -368,6 +368,12 @@ class Renderer:
         using renpy.game.preferences.fullscreen.
         """
 
+    def get_vsync(self):
+        """
+        Returns True if drawing is synchronized to the display's refresh,
+        and False otherwise.
+        """
+
     def can_block(self):
         """
         Returns True if we can block to wait for input, False if the screen
@@ -398,7 +404,7 @@ class Renderer:
         if surf in self.texture_cache:
             del self.texture_cache[surf]
 
-    def load_texture(self, surf, transient=False):
+    def load_texture(self, surf, transient=False, properties={}):
         """
         Loads a surface into a texture.
 
@@ -807,6 +813,7 @@ class Interface:
         # is done, or at the end of the interaction.
         self.force_prediction = False
         self.texture_task: renpy.asynctask.Task | None = None
+        self.prediction_task: renpy.asynctask.Task | None = None
 
         # The number of interactions that have happened without processing an event.
         self.interaction_counter = 0
@@ -1022,6 +1029,9 @@ class Interface:
         """
         Called after the first frame has been drawn.
         """
+
+        if renpy.emscripten:
+            emscripten.run_script(r"""presplashEnd();""")
 
         if renpy.android:
             from jnius import autoclass
@@ -1670,6 +1680,36 @@ class Interface:
         self.last_event = ev
 
         return ev
+
+    def get_earliest_redraw_time(self, first_pass):
+        """
+        Vsync doesn't always limit the framerate. Some platforms stop waiting
+        for vsync when the window is minimized, hidden, or covered (notably
+        ANGLE on Direct3D 11, where DXGI reports the window as occluded), and
+        drivers can disable it. When vsync is requested, this limits drawing
+        to 5 fps when minimized or hidden, and otherwise to 1.5 times the
+        refresh rate of the window's display, but no lower than 90 fps. When
+        vsync is off, drawing is not limited.
+
+        Returns the time before which the screen should not be redrawn, or
+        None if it can be redrawn now.
+        """
+
+        if first_pass or not renpy.display.draw.get_vsync():
+            return None
+
+        if not pygame.display.get_active():
+            min_frame_duration = 1.0 / 5.0
+        else:
+            refresh_rate = pygame.display.get_refresh_rate()
+            min_frame_duration = 1.0 / max(1.5 * refresh_rate, 90.0)
+
+        rv = self.frame_time + min_frame_duration
+
+        if rv <= get_time():
+            return None
+
+        return rv
 
     def compute_overlay(self):
         if renpy.store.suppress_overlay:
@@ -2369,7 +2409,7 @@ class Interface:
         """
 
         renpy.asynctask.create_task(self.run_gc_task())
-        renpy.asynctask.create_task(self.run_prediction_task(root_widget))
+        self.prediction_task = renpy.asynctask.create_task(self.run_prediction_task(root_widget))
         renpy.asynctask.create_task(self.run_filesystem_task())
 
     def run_tasks(self, expensive):
@@ -2394,6 +2434,15 @@ class Interface:
 
             if self.event_peek(False):
                 break
+
+        if (
+            self.force_prediction
+            and self.prediction_task is not None
+            and self.prediction_task.done()
+            and not self.prediction_task.cancelled()
+            and renpy.display.im.cache.done()
+        ):
+            self.force_prediction = False
 
         if expensive:
             renpy.plog(1, "end tasks (expensive)")
@@ -2887,9 +2936,13 @@ class Interface:
                     # This becomes true if we did a redraw this cycle.
                     did_redraw = False
 
+                    # Limit the framerate, in case vsync doesn't.
+                    earliest_redraw_time = self.get_earliest_redraw_time(first_pass)
+
                     # Redraw the screen.
                     if self.force_redraw or (
                         (first_pass or not pygame.event.peek(ALL_EVENTS))
+                        and earliest_redraw_time is None
                         and renpy.display.draw.should_redraw(needs_redraw, first_pass, can_block)
                     ):
                         self.force_redraw = False
@@ -3022,6 +3075,18 @@ class Interface:
                 if self.maximum_framerate_time > get_time():
                     can_block = False
 
+                # Delay the redraw until the next frame is allowed.
+                earliest_redraw_time = self.get_earliest_redraw_time(first_pass)
+
+                if earliest_redraw_time is not None and (
+                    needs_redraw
+                    or (not can_block)
+                    or self.mouse_move
+                    or renpy.display.video.playing()
+                    or redraw_time is not None
+                ):
+                    redraw_time = max(redraw_time or 0, earliest_redraw_time)
+
                 # Compute the redraw time and set the redraw timer.
                 if redraw_time is not None:
                     time_left = redraw_time - get_time()
@@ -3077,7 +3142,12 @@ class Interface:
 
                     self.run_tasks(expensive)
 
-                if needs_redraw or (not can_block) or self.mouse_move or renpy.display.video.playing():
+                if earliest_redraw_time is not None:
+                    # The REDRAW timer will wake us when it's time to draw.
+                    renpy.plog(1, "pre framerate limit wait")
+                    ev = self.event_wait()
+                    renpy.plog(1, "post framerate limit wait {!r}", ev)
+                elif needs_redraw or (not can_block) or self.mouse_move or renpy.display.video.playing():
                     renpy.plog(1, "pre event poll")
                     ev = self.event_poll()
                     renpy.plog(1, "post event poll {!r}", ev)
@@ -3229,6 +3299,14 @@ class Interface:
                     self.ignore_touch = False
                     continue
 
+                # During tests, ignore the user's pointer entering or leaving the window. Otherwise,
+                # the test's simulated mouse events would be treated as if the mouse were elsewhere.
+                if (
+                    ev.type in (pygame.WINDOWMOUSELEAVE, pygame.WINDOWMOUSEENTER)
+                    and renpy.test.testexecution.is_in_test()
+                ):
+                    continue
+
                 # Merge mousemotion events.
                 if ev.type == pygame.MOUSEMOTION:
 
@@ -3323,7 +3401,7 @@ class Interface:
                 if ev is None:
                     continue
 
-                if not self.mouse_focused or self.ignore_touch:
+                if (not self.mouse_focused and not renpy.test.testexecution.is_in_test()) or self.ignore_touch:
                     x = -1
                     y = -1
 

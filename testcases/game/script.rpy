@@ -74,7 +74,7 @@ label start:
 ###############################################################################
 
 init python:
-    _preferences.text_cps = 100
+    _preferences.text_cps = 1000
 
     style.red = Style(style.default)
     style.red.color = "#f00"
@@ -222,7 +222,6 @@ label get_image_bounds:
     "Eileen's bounding box: [bounds]"
 
     return
-
 
 ###############################################################################
 # Retain on Load

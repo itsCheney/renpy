@@ -15,6 +15,28 @@ label hard_pause:
     $ renpy.pause(0.5, hard=True)
     "End"
 
+default rollback_identifier_menu_count = 0
+default menu_rollback_identifier = None
+
+label rollback_identifier_menu:
+    "Before the menu."
+
+    $ rollback_identifier_menu_count += 1
+
+    menu:
+        "Which way?"
+
+        "Done":
+            pass
+
+    "After the menu."
+    return
+
+init python:
+    def capture_menu_rollback_identifier(statement):
+        if statement.startswith("menu"):
+            store.menu_rollback_identifier = renpy.get_rollback_identifier()
+
 screen teleporting_button(x=0, y=0, remaining=20):
     textbutton "Teleporting Button":
         id "teleporting_button"
@@ -107,6 +129,10 @@ testsuite screenshot:
     setup:
         run Preference("display", 1.0)
 
+        # Earlier tests leave the mouse at a random position, which could hover over a button. No
+        # screen in this suite has anything here.
+        move pos (300, 500)
+
     testcase main_menu:
         screenshot "main_menu.png" #crop (0, 0, 400, 300)
 
@@ -153,6 +179,22 @@ testsuite boolean_conditions:
     testcase boolean_value_false2:
         xfail True  # The test should fail
         assert False
+
+    testcase boolean_value_mixed:
+        xfail True  # A passing assert should not hide the failing one
+        assert True
+        assert False
+
+    testcase boolean_value_mixed_status:
+        description "Checks that boolean_value_mixed was reported as xfailed."
+
+        python:
+            reporter = renpy.test.testreporter.reporter
+            suite_outcome = reporter.outcome_manager.get_outcome_by_test_block(reporter.suites[-1])
+            mixed = [c for c in suite_outcome.children if c.name == "boolean_value_mixed"][0]
+
+            assert mixed.status == renpy.test.testreporter.OutcomeStatus.XFAILED, mixed.status
+            assert (mixed.num_asserts_passed, mixed.num_asserts_xfailed) == (1, 1)
 
     testcase boolean_operators:
         assert not False
@@ -392,6 +434,37 @@ testsuite context:
         assert eval ("context_test_inner_val" in globals())
         $ renpy.end_replay()
         assert eval ("replay_scope" in globals())
+
+testsuite rollback_identifier:
+    description "Tests `renpy.get_rollback_identifier` with `RollbackToIdentifier`."
+
+    setup:
+        $ config.statement_callbacks.append(capture_menu_rollback_identifier)
+
+    teardown:
+        $ config.statement_callbacks.remove(capture_menu_rollback_identifier)
+
+    testcase menu:
+        description "Rolls back to a menu identifier captured by a statement callback."
+
+        $ menu_rollback_identifier = None
+        run Start("rollback_identifier_menu")
+        advance until screen "choice"
+
+        assert eval (menu_rollback_identifier is not None)
+        assert eval (rollback_identifier_menu_count == 1)
+
+        click "Done"
+        advance until "After the menu."
+        assert eval (renpy.get_identifier_checkpoints(menu_rollback_identifier) is not None)
+
+        run RollbackToIdentifier(menu_rollback_identifier)
+        pause until screen "choice"
+
+        assert eval (rollback_identifier_menu_count == 1)
+
+        click "Done"
+        advance until "After the menu."
 
 testsuite for_loops:
     description "Tests `for` loop statements with various patterns."
@@ -764,6 +837,15 @@ testsuite test_expressions:
         $ element_id = "teleporting_button"
         $ screen_name = "teleporting_button"
         click button btn id element_id until not screen screen_name
+
+    testcase click_after_pointer_leaves_window:
+        description "The user's pointer leaving the window doesn't stop simulated clicks."
+
+        run Show("teleporting_button")
+        assert screen "teleporting_button"
+
+        $ renpy.pygame.event.post(renpy.pygame.event.Event(renpy.pygame.WINDOWMOUSELEAVE))
+        click id "teleporting_button" until not screen "teleporting_button"
 
     testcase scroll_amount:
         description "Scroll amount accepts a variable for the scroll amount."
