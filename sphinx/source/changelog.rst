@@ -36,7 +36,13 @@ Ren'Py 8.5 or earlier. A single part can override it by passing `glsl` to
 :func:`renpy.register_shader` or :func:`renpy.register_textshader`.
 
 Existing shader parts do not require changes. Ren'Py translates between the two
-versions, so parts written in either can be combined in the same shader.
+versions, so parts written in either can be combined in the same shader. A part
+that doesn't pass `glsl`, but uses syntax that only exists in GLSL ES 1.00 (like
+``attribute``, ``varying``, or ``gl_FragColor``), is treated as being written in
+GLSL ES 1.00 even when :var:`config.glsl_version` is 300. Ren'Py will not infer
+the version of a part that uses GLSL ES 3.00 syntax when
+:var:`config.glsl_version` is 100; see the :ref:`incompatible changes
+<incompatible-8.6.0>`.
 
 Shader combinations used by predicted displayables are now compiled during
 idle prediction, reducing stalls when they are first shown. The new
@@ -69,18 +75,6 @@ contain data rather than colors, like normal maps. Passing ``premultiply=False``
 to :meth:`Model.texture` requires a literal image filename; image names,
 interpolated filenames, and displayable objects raise ValueError.
 
-Fixed a crash when transitions copy a Model containing a DynamicImage texture.
-The copied texture now preserves its texture wrapping settings.
-
-Fixed joined Drags restoring positions incorrectly, invoking the ``dragging``
-callback before all joined Drags had moved, and forwarding child events twice.
-
-Fixed a failure when replacing a save file from deleting the previous save.
-If replacement still fails after retrying, the error is reported and the
-temporary save file is removed.
-
-Fixed the web presplash disappearing before display initialization finished.
-It now remains visible until the first frame is drawn.
 
 Ren'Py's framerate safeguard now limits framerate to at most 1.5 times the refresh rate of the window's display,
 or at least 90 fps, whichever is higher, when vsync is enabled. This kicks in when the framerate would otherwise
@@ -203,6 +197,8 @@ changed.
 Resource path translations can now be overridden independently of the global language with
 :var:`_preferences.resource_path_translations` and :class:`ChangeResourcePathTranslation`.
 
+The new :func:`renpy.safe_rename` function moves a temporary file into place, replacing an existing file if there is one, and handles files that are open in another program on Windows.
+
 The new :func:`renpy.music.seek` function seeks the audio or video currently playing on a channel, while :class:`AudioPositionValue` now accepts an `adjustable` argument that allows a bar to seek when dragged.
 
 A new :ref:`renpy.red_to_alpha <shader-renpy.red_to_alpha>` shader part has been added, which creates a new image that is white with the alpha taken from
@@ -273,6 +269,9 @@ see :var:`config.image_directories` and :var:`config.audio_directories`.
 
 The new :var:`config.audio_directories` variable is a list of directories that are searched for audio Files
 and used to populate the :ref:`audio-namespace <audio-namespace>`.
+
+The directories in :var:`config.audio_directories` and :var:`config.image_directories` are now also searched when
+a file is loaded by name, after the directories in :var:`config.special_directory_map`.
 
 The ``if``, ``elif``, and ``else`` clauses of a :ref:`layered image <layeredimage-statement>` can now contain a
 nested ``if`` statement, in place of a displayable.

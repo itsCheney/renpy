@@ -357,7 +357,9 @@ class FileLocation(object):
 
     def rename(self, old, new):
         """
-        If old exists, renames it to new.
+        If old exists, renames it to new. If this fails, an OSError propagates
+        and old is kept, unless moving it back also fails, which leaves it at
+        old + tmp. new may already have been discarded (see safe_rename).
         """
 
         with disk_lock:
@@ -368,8 +370,14 @@ class FileLocation(object):
                 return
 
             old_tmp = old + tmp
-            safe_rename(old, old_tmp)
-            safe_rename(old_tmp, new)
+            safe_rename(old, old_tmp, keep_from=True)
+
+            try:
+                safe_rename(old_tmp, new, keep_from=True)
+            except OSError:
+                os.replace(old_tmp, old)
+                raise
+
             renpy.util.expose_file(new)
 
             self.sync()
@@ -440,7 +448,10 @@ class FileLocation(object):
                     f.write(data)
 
                 safe_rename(fn_tmp, fn_new)
-                safe_rename(fn_new, fn)
+
+                # Keep persistent.new on failure, as it's loaded in place of
+                # fn, which may already have been discarded.
+                safe_rename(fn_new, fn, keep_from=True)
 
                 # Prevent persistent from unpickle just after save
                 self.persistent_mtime = os.path.getmtime(fn)

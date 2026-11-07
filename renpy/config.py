@@ -1189,7 +1189,10 @@ gl_program_cache = False
 
 # The GLSL dialect shader parts are written in when they don't pass glsl to
 # renpy.register_shader. 300 selects GLSL ES 3.00 and 100 selects GLSL ES
-# 1.00. Games declaring compatibility with 8.5 or earlier get 100.
+# 1.00. Games declaring compatibility with 8.5 or earlier get 100. When this
+# is 300, a part that doesn't pass glsl but uses a construct only found in
+# GLSL ES 1.00 (such as attribute, varying, or gl_FragColor) is treated as
+# being written in GLSL ES 1.00.
 glsl_version = 300
 
 # OpenGL Blend Funcs
@@ -1689,6 +1692,24 @@ special_directory_map: dict[str, list[str]] = {"images": ["images"], "audio": ["
 """
 This maps the special directory names ('images', 'audio', 'fonts') to a list of directories that will
 be searched for that kind of file.
+"""
+
+audio_directories: list[str] = ["audio"]
+"""
+A list of directories used to populate the audio namespace. These are also searched when loading an audio file by
+name, after the directories in special_directory_map.
+"""
+
+image_directories: list[str] = ["images"]
+"""
+A list of directories used to define images automatically. These are also searched when loading an image file by
+name, after the directories in special_directory_map.
+"""
+
+add_to_special_directories: bool = True
+"""
+If True, audio_directories and image_directories are searched when loading a file by name. If False, only the
+directories in special_directory_map are searched.
 """
 
 font_size_adjust: dict[str, float | Callable[[str, float], float]] = {}
